@@ -29,6 +29,8 @@
 
 #include <esp_idf_version.h>
 
+extern DHT22_t DHT22;
+
 static const char *TAG = "subpub";
 
 static TaskHandle_t task_aws_iot = NULL;
@@ -39,7 +41,7 @@ static EventGroupHandle_t wifi_event_group;
 /* The event group allows multiple bits for each event,
    but we only care about one event - are we connected
    to the AP with an IP? */
-const int CONNECTED_BIT = BIT0;
+const int CONNECTED_BIT = BIT1;
 
 extern const uint8_t aws_root_ca_pem_start[] asm("_binary_aws_root_ca_pem_start");
 extern const uint8_t aws_root_ca_pem_end[] asm("_binary_aws_root_ca_pem_end");
@@ -139,7 +141,7 @@ int8_t wifi_app_get_rssi(void)
 }
 
 void aws_iot_task(void *param) {
-    char cPayload[100];
+    char cPayload[100], cPayload2[100];
 
     int i = 0;
 
@@ -154,7 +156,7 @@ void aws_iot_task(void *param) {
 
     ESP_LOGI(TAG, "AWS IoT SDK Version %d.%d.%d-%s", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
 
-    mqttInitParams.enableAutoReconnect = false; // We enable this later below
+    mqttInitParams.enableAutoReconnect = true; // We enable this later below
     mqttInitParams.pHostURL = HostAddress;
     mqttInitParams.port = port;
 
@@ -178,7 +180,7 @@ void aws_iot_task(void *param) {
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
                         false, true, portMAX_DELAY);
 
-    connectParams.keepAliveIntervalInSec = 10;
+    connectParams.keepAliveIntervalInSec = 60;
     connectParams.isCleanSession = true;
     connectParams.MQTTVersion = MQTT_3_1_1;
     /* Client ID is set in the menuconfig of the example */
@@ -206,11 +208,20 @@ void aws_iot_task(void *param) {
         abort();
     }
 
-    const char *TOPIC = "test_topic/esp32";
+    const char *TOPIC = "sensor/hume";//"test_topic/esp32";
     const int TOPIC_LEN = strlen(TOPIC);
+
+    const char *TOPIC2 = "sensor/temp";//"test_topic/esp32";
+    const int TOPIC_LEN2 = strlen(TOPIC2);
 
     ESP_LOGI(TAG, "Subscribing...");
     rc = aws_iot_mqtt_subscribe(&client, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
+    if(SUCCESS != rc) {
+        ESP_LOGE(TAG, "Error subscribing : %d ", rc);
+        abort();
+    }
+
+    rc = aws_iot_mqtt_subscribe(&client, TOPIC2, TOPIC_LEN2, QOS1, iot_subscribe_callback_handler, NULL);
     if(SUCCESS != rc) {
         ESP_LOGE(TAG, "Error subscribing : %d ", rc);
         abort();
@@ -223,7 +234,7 @@ void aws_iot_task(void *param) {
     paramsQOS0.isRetained = 0;
 
     paramsQOS1.qos = QOS1;
-    paramsQOS1.payload = (void *) cPayload;
+    paramsQOS1.payload = (void *) cPayload2;
     paramsQOS1.isRetained = 0;
 
     while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
@@ -235,17 +246,21 @@ void aws_iot_task(void *param) {
             continue;
         }
 
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
         ESP_LOGI(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetName(NULL), uxTaskGetStackHighWaterMark(NULL));
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        //sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS0)", i++);
-        sprintf(cPayload, "%s : %d ", "WiFi RSSI", wifi_app_get_rssi());
+        //sprintf(cPayload, "%s : %d ", "Data", i++);
+
+        //sprintf(cPayload, "%.1f", getHumidity());
+        sprintf(cPayload, "%d", DHT22.hume/10);
         paramsQOS0.payloadLen = strlen(cPayload);
         rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS0);
 
-        sprintf(cPayload, "%s : %.1f, %s : %.1f", "Temperature", getTemperature(), "Humidity", getHumidity());
+        //sprintf(cPayload2, "%.1f", getTemperature());
+        sprintf(cPayload2, "%d", DHT22.temp/10);
         //sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS1)", i++);
-        paramsQOS1.payloadLen = strlen(cPayload);
-        rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS1);
+        //sprintf(cPayload, "%s : %.1f, %s : %.1f", "Temperature", getTemperature(), "Humidity", getHumidity());
+        paramsQOS1.payloadLen = strlen(cPayload2);
+        rc = aws_iot_mqtt_publish(&client, TOPIC2, TOPIC_LEN2, &paramsQOS1);
         if (rc == MQTT_REQUEST_TIMEOUT_ERROR) {
             ESP_LOGW(TAG, "QOS1 publish ack not received.");
             rc = SUCCESS;

@@ -14,7 +14,7 @@ void app_main()
     }
     ESP_ERROR_CHECK( err );
 
-    DHT22_task_start();
+    APP_DHT22_task();
 
     initialise_wifi();
     aws_iot_start();
