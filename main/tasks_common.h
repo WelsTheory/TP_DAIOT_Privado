@@ -10,8 +10,8 @@
 
 #define CONFIG_AWS_EXAMPLE_CLIENT_ID "TP_DaIoT_NodeRed"//"DAIoT_TP"
 
-#define EXAMPLE_WIFI_SSID "WELS_LIBI"//"wels"//
-#define EXAMPLE_WIFI_PASS "w@2801(-)0104@w"//"979254458"//
+#define EXAMPLE_WIFI_SSID "wels"//"WELS_LIBI"//
+#define EXAMPLE_WIFI_PASS "979254458"//"w@2801(-)0104@w"//
 
 // WiFi application task
 #define WIFI_APP_TASK_STACK_SIZE			4096

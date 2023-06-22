@@ -221,8 +221,8 @@ esp_err_t dht_read_float_data(dht_sensor_type_t sensor_type, gpio_num_t pin,
 }
 
 void dht_task(void *pvParameter) {
-	int16_t temperature = 0;
-	int16_t humidity = 0;
+	//int16_t temperature = 0;
+	//int16_t humidity = 0;
 
     // DHT sensors that come mounted on a PCB generally have
     // pull-up resistors on the data pin.  It is recommended
